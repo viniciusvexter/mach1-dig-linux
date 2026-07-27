@@ -113,9 +113,9 @@ Para facilitar a distribuição e instalação em sistemas baseados em Debian, c
    ./build_deb.sh
    ```
 
-3. O script criará um arquivo chamado `mach1-dig-linux_1.0-1_all.deb`. Para instalar, basta rodar:
+3. O script criará um arquivo chamado `mach1-dig-linux_1.0-2_all.deb` em `../../dist/mach1/`. Para instalar, basta rodar:
    ```bash
-   sudo apt install ./mach1-dig-linux_1.0-1_all.deb
+   sudo apt install ../../dist/mach1/mach1-dig-linux_1.0-2_all.deb
    ```
 
 Ao instalar o pacote, ele já coloca as regras do `udev` no lugar certo e prepara o serviço `systemd`. Você só precisará habilitar e iniciar o serviço:
