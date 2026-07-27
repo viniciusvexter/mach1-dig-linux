@@ -1,0 +1,14 @@
+[Unit]
+Description=MACH1 DIG LCD Temperature Display
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+# Usa "-s auto" para detecção automática de sensores em AMD e Intel
+ExecStart=/usr/bin/python3 /usr/bin/mach1-control on -s "auto" -u c
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
