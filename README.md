@@ -1,4 +1,4 @@
-# displaystorm-linux
+# mach1-dig-linux
 
 Monorepo Linux para controle de coolers LCD baseados em HID.
 
