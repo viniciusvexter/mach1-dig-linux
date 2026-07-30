@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=MACH1 Control Center
-Comment=Interface gráfica de controle do display LCD de cooler MACH1 DIG
-Exec=python3 /usr/bin/mach1-gui
-Icon=hardware
-Terminal=false
-Type=Application
-Categories=System;Settings;HardwareSettings;
-Keywords=mach1;cooler;lcd;temperature;fan;

@@ -17,10 +17,11 @@ Manter um monorepo Linux para drivers de coolers com display LCD, com foco princ
 
 Modulo principal do projeto. Contem:
 
-- CLI de controle do display MACH1
-- Integracao de sensores e logica de exibicao
-- Build de pacote Debian
-- Estrutura de empacotamento em `packaging/deb/`
+- Interface Gráfica (GUI) em Tkinter (`mach1-gui.py`) no estilo oficial Windows
+- CLI de controle do display MACH1 (`mach1-control.py`)
+- Integracao de sensores (Temperatura °C/°F, Potência Watts e Ventoinha RPM)
+- Build de pacote Debian (`mach1-dig-linux_1.7-1_all.deb`)
+- Estrutura de empacotamento em `packaging/deb/` e atalho `.desktop`
 
 ### apps/ocypus
 
