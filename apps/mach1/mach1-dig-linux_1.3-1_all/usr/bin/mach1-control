@@ -24,7 +24,6 @@ import signal
 import sys
 import textwrap
 import time
-import json
 from types import FrameType
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -270,8 +269,8 @@ class Mach1Controller:
         if lower_value is None:
             if mode.lower() == 'fan':
                 rpm = self.fan_reader.get_rpm()
-                # Para exibir no painel de 3 dígitos, dividimos o RPM por 10 (ex: 150 = 1500 RPM)
-                lower_value = rpm / 10.0
+                # Para exibir no painel de 3 dígitos: se RPM > 999, exibe RPM / 10 (ex: 150 = 1500 RPM)
+                lower_value = (rpm / 10.0) if rpm > 999 else rpm
             else:
                 lower_value = watts
 
@@ -439,28 +438,6 @@ def run_display_loop(controller: Mach1Controller,
     
     while True:
         try:
-            # Carregar estado sobreposto (override) da GUI/Tray, se existir
-            state_file = "/tmp/mach1_state.json"
-            current_unit = unit
-            current_mode = mode
-            display_on = True
-
-            if os.path.exists(state_file):
-                try:
-                    with open(state_file, 'r') as f:
-                        state_data = json.load(f)
-                        current_unit = state_data.get('unit', unit)
-                        current_mode = state_data.get('mode', mode)
-                        display_on = state_data.get('display_on', True)
-                except Exception:
-                    pass
-
-            if not display_on:
-                if controller.device:
-                    controller.blank_display()
-                time.sleep(refresh_rate)
-                continue
-
             if not controller.device:
                 print("\nDispositivo desconectado. Tentando reconectar ao cooler MACH1...")
                 if not controller.open():
@@ -477,28 +454,15 @@ def run_display_loop(controller: Mach1Controller,
                 success = controller.send_display_data(
                     temp_celsius=temp_celsius, 
                     watts=watts, 
-                    unit=current_unit, 
-                    mode=current_mode
+                    unit=unit, 
+                    mode=mode
                 )
                 if success:
                     last_keepalive = time.time()
-                    display_temp = temp_celsius if current_unit.lower() == 'c' else temp_celsius * 9/5 + 32
-                    unit_symbol = '°C' if current_unit.lower() == 'c' else '°F'
-                    mode_info = f"Power: {watts:.1f}W" if current_mode.lower() == 'power' else f"Fan: {rpm:.0f} RPM"
+                    display_temp = temp_celsius if unit.lower() == 'c' else temp_celsius * 9/5 + 32
+                    unit_symbol = '°C' if unit.lower() == 'c' else '°F'
+                    mode_info = f"Power: {watts:.1f}W" if mode.lower() == 'power' else f"Fan: {rpm:.0f} RPM"
                     print(f"\rSensor: {sensor_name} | Temp: {display_temp:.1f}{unit_symbol} | {mode_info}   ", end="", flush=True)
-
-                    # Escreve a telemetria para a GUI/Tray consumirem
-                    try:
-                        with open("/tmp/mach1_telemetry.json", "w") as f:
-                            json.dump({
-                                "sensor_name": sensor_name,
-                                "temp_c": float(temp_celsius),
-                                "watts": float(watts),
-                                "rpm": float(rpm),
-                                "connected": True
-                            }, f)
-                    except Exception:
-                        pass
                 else:
                     print("\rFalha ao enviar dados para o display. Fechando conexão para tentar reconectar...", end="", flush=True)
                     controller.close()
@@ -507,7 +471,7 @@ def run_display_loop(controller: Mach1Controller,
                 print(f"\rNenhum sensor de temperatura encontrado", end="", flush=True)
                 current_time = time.time()
                 if current_time - last_keepalive >= KEEPALIVE_INTERVAL:
-                    if controller.send_display_data(temp_celsius=0, watts=0, unit=current_unit, mode=current_mode):
+                    if controller.send_display_data(temp_celsius=0, watts=0, unit=unit, mode=mode):
                         last_keepalive = current_time
                     else:
                         controller.close()

@@ -39,9 +39,25 @@ O script foi escrito em Python 3 e requer os seguintes pacotes para rodar:
    pip install -r requirements.txt
    ```
 
-## Uso Manual
+## Interface Gráfica (GUI Estilo Windows)
 
-Você pode executar o script manualmente para testar se ele consegue se comunicar com o seu display:
+Agora o driver conta com uma **Interface Gráfica (GUI)** com o mesmo design futurista do aplicativo original do Windows para fácil controle dos seletores:
+
+- **DISPLAY**: Ativar (`ON`) ou desativar (`OFF`) a tela LCD.
+- **TEMP.**: Alternar a unidade entre Celsius (`°C`) e Fahrenheit (`°F`).
+- **INFERIOR**: Alternar os dígitos inferiores entre Consumo em Watts (`W`) e Velocidade do Cooler (`RPM`).
+
+Para executar a interface gráfica:
+
+```bash
+python3 mach1-gui.py
+```
+
+Ou através do menu de aplicações do seu sistema após instalar o pacote `.deb` (**MACH1 Control Center**).
+
+## Uso Manual (CLI)
+
+Você pode executar o script via terminal para testar se ele consegue se comunicar com o seu display:
 
 ```bash
 # Listar se o cooler foi encontrado e em qual interface USB ele está plugado
@@ -52,6 +68,9 @@ sudo python3 mach1-control.py on
 
 # Ligar usando Fahrenheit em vez de Celsius
 sudo python3 mach1-control.py on -u f
+
+# Exibir a rotação da ventoinha (RPM) na linha inferior em vez de Watts
+sudo python3 mach1-control.py on -m fan
 
 # Usar um sensor específico, como k10temp para processadores AMD
 sudo python3 mach1-control.py on -s "k10temp"
@@ -87,9 +106,13 @@ Para que o Linux ligue o display automaticamente quando o PC iniciar, crie um se
 1. Certifique-se de estar dentro da pasta do projeto e com o ambiente virtual ativado (se aplicável).
 2. Rode o comando de instalação:
    ```bash
-   sudo python3 mach1-control.py install-service -s "coretemp" -u c
+   # Exemplo exibindo consumo em Watts:
+   sudo python3 mach1-control.py install-service -s "auto" -u c -m power
+
+   # Exemplo exibindo velocidade do cooler (RPM):
+   sudo python3 mach1-control.py install-service -s "auto" -u c -m fan
    ```
-   *(Substitua "coretemp" pelo nome do seu sensor preferido de acordo com sua CPU).*
+   *(Substitua "auto" pelo nome do seu sensor preferido de acordo com sua CPU).*
 
 3. Ative o serviço gerado:
    ```bash
@@ -113,12 +136,22 @@ Para facilitar a distribuição e instalação em sistemas baseados em Debian, c
    ./build_deb.sh
    ```
 
-3. O script criará um arquivo chamado `mach1-dig-linux_1.0-2_all.deb` em `../../dist/mach1/`. Para instalar, basta rodar:
+3. O script criará o pacote **versão 1.7-1** chamado `mach1-dig-linux_1.7-1_all.deb` em `../../dist/mach1/`. Para instalar ou fazer upgrade, basta rodar:
    ```bash
-   sudo apt install ../../dist/mach1/mach1-dig-linux_1.0-2_all.deb
+   cp ../../dist/mach1/mach1-dig-linux_1.7-1_all.deb /tmp/
+   sudo apt install /tmp/mach1-dig-linux_1.7-1_all.deb
    ```
 
-Ao instalar o pacote, ele já coloca as regras do `udev` no lugar certo e prepara o serviço `systemd`. Você só precisará habilitar e iniciar o serviço:
+Ao instalar o pacote, ele já coloca a interface gráfica (`mach1-gui`), o atalho no menu de aplicações, as regras do `udev` no lugar certo e prepara o serviço `systemd`. Você só precisará habilitar e iniciar o serviço:
 ```bash
 sudo systemctl enable --now mach1-lcd.service
 ```
+
+## Solução de Problemas e Diagnóstico
+
+Se o display parar de atualizar ou apresentar congelamentos por erros no barramento USB do Linux (ex.: erro `-71 / EPROTO`), consulte o relatório detalhado em [DIAGNOSTICO.md](file:///home/vinicius-ferreira/Projects/displaystorm-linux/apps/mach1/DIAGNOSTICO.md).
+
+O driver conta com as seguintes melhorias de resiliência:
+- **Validação de retorno HID:** Verificação do código de retorno de `send_feature_report()` para identificar transmissões com falha (`res < 0`).
+- **Reconexão automática:** Em caso de perda de comunicação ou desconexão física, a conexão HID é resetada e o driver tenta reconectar continuamente a cada 2 segundos.
+

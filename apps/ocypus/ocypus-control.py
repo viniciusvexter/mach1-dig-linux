@@ -16,6 +16,7 @@ FEATURES
 """
 
 import argparse
+import glob
 import os
 import signal
 import sys
@@ -72,6 +73,22 @@ class OcypusController:
 
     def open(self) -> bool:
         """Opens the first working Ocypus device interface."""
+        if self.device:
+            self.close()
+
+        # Try disabling USB autosuspend directly via sysfs if accessible
+        for dev_sys in glob.glob("/sys/bus/usb/devices/*/idVendor"):
+            try:
+                with open(dev_sys, "r") as f:
+                    if f.read().strip().lower() == "1a2c":
+                        pdir = os.path.dirname(dev_sys)
+                        ctrl_file = os.path.join(pdir, "power", "control")
+                        if os.path.exists(ctrl_file):
+                            with open(ctrl_file, "w") as cf:
+                                cf.write("on")
+            except Exception:
+                pass
+
         devices = hid.enumerate(VID, PID)
         if not devices:
             print("No Ocypus cooler found.")
@@ -90,7 +107,18 @@ class OcypusController:
                 device.open_path(device_info['path'])
                 # Test if we can send a report
                 test_report = [REPORT_ID] + [0] * (REPORT_LENGTH - 1)
-                device.send_feature_report(test_report)
+                res = device.send_feature_report(test_report)
+                if res < 0:
+                    try:
+                        res = device.write(test_report)
+                    except Exception:
+                        res = -1
+                if res < 0:
+                    try:
+                        device.close()
+                    except Exception:
+                        pass
+                    continue
                 
                 self.device = device
                 self.interface_number = interface_number
@@ -99,7 +127,7 @@ class OcypusController:
             except Exception as e:
                 try:
                     device.close()
-                except:
+                except Exception:
                     pass
                 continue
 
@@ -137,17 +165,28 @@ class OcypusController:
         tens = display_temp // 10
         ones = display_temp % 10
 
-        try:
-            report = [REPORT_ID] + [0] * (REPORT_LENGTH - 1)
-            report[SLOT_TENS] = tens
-            report[SLOT_ONES] = ones
-            report[7] = unit_flag  # Temperature unit flag
-            
-            self.device.send_feature_report(report)
-            return True
-        except Exception as e:
-            print(f"Error sending temperature: {e}")
-            return False
+        report = [REPORT_ID] + [0] * (REPORT_LENGTH - 1)
+        report[SLOT_TENS] = tens
+        report[SLOT_ONES] = ones
+        report[7] = unit_flag  # Temperature unit flag
+
+        for attempt in range(3):
+            try:
+                # Attempt 1: Feature Report
+                res = self.device.send_feature_report(report)
+                if res >= 0:
+                    return True
+
+                # Attempt 2 (Fallback): Output Report (write)
+                res_write = self.device.write(report)
+                if res_write >= 0:
+                    return True
+            except Exception:
+                pass
+            time.sleep(0.02)
+
+        print("\nError sending temperature to display after retries (Feature & Output Report)")
+        return False
 
     def blank_display(self) -> bool:
         """Blanks the LCD display."""
@@ -157,8 +196,8 @@ class OcypusController:
 
         try:
             report = [REPORT_ID] + [0] * (REPORT_LENGTH - 1)
-            self.device.send_feature_report(report)
-            return True
+            res = self.device.send_feature_report(report)
+            return res >= 0
         except Exception as e:
             print(f"Error blanking display: {e}")
             return False
@@ -244,6 +283,12 @@ def run_display_loop(controller: OcypusController,
     
     while True:
         try:
+            if not controller.device:
+                print("\nDevice disconnected. Attempting to reconnect to Ocypus cooler...")
+                if not controller.open():
+                    time.sleep(2.0)
+                    continue
+
             sensors = get_temperature_sensors()
             sensor_data = find_sensor_by_substring(sensors, sensor_substring)
             
@@ -251,17 +296,23 @@ def run_display_loop(controller: OcypusController,
                 sensor_name, temp_celsius = sensor_data
                 success = controller.send_temperature(temp_celsius, unit)
                 if success:
+                    last_keepalive = time.time()
                     display_temp = temp_celsius if unit.lower() == 'c' else temp_celsius * 9/5 + 32
                     unit_symbol = '°C' if unit.lower() == 'c' else '°F'
                     print(f"\rSensor: {sensor_name} | Temp: {display_temp:.1f}{unit_symbol}", end="", flush=True)
                 else:
-                    print("\rFailed to send temperature", end="", flush=True)
+                    print("\rFailed to send temperature. Closing connection to retry...", end="", flush=True)
+                    controller.close()
+                    time.sleep(1.0)
             else:
                 print(f"\rNo temperature sensor found", end="", flush=True)
                 current_time = time.time()
                 if current_time - last_keepalive >= KEEPALIVE_INTERVAL:
-                    controller.send_temperature(0, unit)
-                    last_keepalive = current_time
+                    if controller.send_temperature(0, unit):
+                        last_keepalive = current_time
+                    else:
+                        controller.close()
+                        time.sleep(1.0)
             
             time.sleep(refresh_rate)
             
@@ -270,14 +321,20 @@ def run_display_loop(controller: OcypusController,
             break
         except Exception as e:
             print(f"\nError in display loop: {e}")
+            controller.close()
             time.sleep(refresh_rate)
 
 
 def install_udev_rules(rules_path: str = "/etc/udev/rules.d/99-ocypus-cooler.rules"):
-    """Installs udev rules to allow access without sudo."""
+    """Installs udev rules to allow access without sudo and disable USB autosuspend."""
     content = """# UDEV rule for Ocypus Iota A40 Cooler
+# Non-root access permissions
 SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="434d", MODE="0666"
 KERNEL=="hidraw*", ATTRS{idVendor}=="1a2c", MODE="0666"
+
+# Disable USB Autosuspend in Linux kernel (prevents display freezes / error -71)
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTR{power/autosuspend}="-1"
 """
     try:
         with open(rules_path, 'w') as f:
@@ -285,7 +342,7 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="1a2c", MODE="0666"
         print(f"UDEV rules saved to {rules_path}")
         print("Reloading udev rules...")
         os.system("udevadm control --reload-rules && udevadm trigger")
-        print("Success! The device can now be accessed without sudo.")
+        print("Success! The device can now be accessed without sudo and USB Autosuspend was disabled.")
     except PermissionError:
         print(f"Error: Permission denied. Run with sudo: sudo python3 {sys.argv[0]} install-udev")
     except Exception as e:
@@ -409,8 +466,7 @@ def main():
     
     elif args.command == 'on':
         with OcypusController() as controller:
-            if controller.device:
-                run_display_loop(controller, args.sensor, args.unit, args.rate)
+            run_display_loop(controller, args.sensor, args.unit, args.rate)
     
     elif args.command == 'off':
         with OcypusController() as controller:

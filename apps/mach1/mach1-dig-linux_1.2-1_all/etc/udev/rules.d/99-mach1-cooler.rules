@@ -1,0 +1,9 @@
+# Regra UDEV para o Cooler MACH1 DIG
+# Permissão de acesso sem sudo
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="4d84", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTRS{idProduct}=="4c84", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="1a2c", MODE="0666"
+
+# Desativação do USB Autosuspend / Selecionado no kernel Linux (evita travamento do display / erro -71)
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1a2c", ATTR{power/autosuspend}="-1"

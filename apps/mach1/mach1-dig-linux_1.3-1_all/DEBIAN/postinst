@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+# Recarregar as regras do udev
+udevadm control --reload-rules || true
+udevadm trigger || true
+# Habilitar e iniciar o serviço, se o systemd estiver rodando
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    # Vamos deixar o serviço desabilitado por padrão para que o usuário
+    # configure qual sensor usar editando o arquivo, mas se preferir,
+    # descomente a linha abaixo para iniciar automaticamente:
+    # systemctl enable --now mach1-lcd.service || true
+fi

@@ -1,0 +1,11 @@
+Package: mach1-dig-linux
+Version: 1.2-1
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-tk, python3-psutil, python3-hid | python3-hidapi, libhidapi-hidraw0
+Maintainer: Seu Nome <seu.email@exemplo.com>
+Description: Driver e Interface Gráfica Linux para display de cooler MACH1 DIG
+ Driver em user-space e GUI no estilo Windows para controle de
+ temperatura, unidade °C/°F, ligar/desligar display e exibição de
+ consumo (Watts) ou rotação de ventoinha (RPM).
