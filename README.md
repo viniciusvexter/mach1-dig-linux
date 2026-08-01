@@ -1,6 +1,6 @@
 # mach1-dig-linux
 
-Monorepo Linux para controle de coolers LCD baseados em HID.
+Controle de coolers LCD baseados em HID.
 
 Foco principal deste projeto: versao Linux do aplicativo do MACH1 DIG, que hoje possui software oficial somente para Windows.
 
