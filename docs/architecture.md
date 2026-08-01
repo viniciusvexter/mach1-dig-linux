@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Manter um monorepo Linux para drivers de coolers com display LCD, com foco principal no MACH1 DIG.
+Drivers de coolers com display LCD, com foco principal no MACH1 DIG.
 
 ## Principios
 
